@@ -265,6 +265,8 @@ udpOpen(ClientData clientData, Tcl_Interp *interp,
         int argc, CONST84 char * argv[]) 
 {
     int sock;
+    int result = -1;
+    char localaddr[256];
     char channelName[20];
     UdpState *statePtr;
     uint16_t localport = 0;
@@ -274,9 +276,10 @@ udpOpen(ClientData clientData, Tcl_Interp *interp,
     unsigned long status = 1;
     socklen_t len;
 	short ss_family = AF_INET; /* Default ipv4 */ 
-	char errmsg[] = "upd_open [remoteport] [ipv6] [reuse]";
+	char errmsg[] = "upd_open [remoteport] [localaddr]  [ipv6] [reuse]";
 	int remaining_options = argc;
 	
+    memset(localaddr, 0, sizeof(localaddr));
     if (argc >= 2) {		
 		if (hasOption(argc,argv,"reuse")) {
            reuse = 1;
@@ -287,6 +290,28 @@ udpOpen(ClientData clientData, Tcl_Interp *interp,
  			ss_family = AF_INET6;
  			remaining_options--;			
  		}
+		/* The remaining option has to be the local ip*/
+		if (remaining_options == 3){
+			Tcl_Obj *value;
+			value = Tcl_NewStringObj(argv[2],-1);
+			strcpy(localaddr,Tcl_GetString(value));
+/*			if(ss_family = AF_INET6)
+				result = inet_pton(AF_INET6,"127.0.0.1", &(((struct sockaddr_in6 *) &addr)->sin6_addr));
+			else
+				
+				result = inet_pton(AF_INET,"127.0.0.1", &(((struct sockaddr_in *) &addr)->sin_addr));
+	
+
+			if (!result){
+				memset(errmsg,0,sizeof(errmsg));
+				sprintf(errmsg,"ip: %s, error: %d",localaddr,result);
+				Tcl_SetResult(interp,errmsg,NULL);
+				return TCL_ERROR;
+			}*/
+		
+			remaining_options--;
+
+		}
 		/* The remaining option must be the port (if specified) */
 		if (remaining_options == 2) {
 		   if (udpGetService(interp, argv[1], &localport) != TCL_OK) {
@@ -341,10 +366,34 @@ udpOpen(ClientData clientData, Tcl_Interp *interp,
 	if (ss_family == AF_INET6) {
 		((struct sockaddr_in6 *) &addr)->sin6_family = AF_INET6;
 		((struct sockaddr_in6 *) &addr)->sin6_port = localport;
+		if(strcmp(localaddr,"")){
+			result = inet_pton(AF_INET6,localaddr, &(((struct sockaddr_in6 *) &addr)->sin6_addr));
+			if(!result){
+				Tcl_SetResult(interp,errmsg,NULL);
+				return TCL_ERROR;
+			}
+
+		}
+		else{
+			strcpy(localaddr,"0.0.0.0");
+	
+		}
 		addr_len = sizeof(struct sockaddr_in6);
 	} else {
 		((struct sockaddr_in *) &addr)->sin_family = AF_INET;
 		((struct sockaddr_in *) &addr)->sin_port = localport;
+		if(strcmp(localaddr,"")){
+			result = inet_pton(AF_INET,localaddr, &(((struct sockaddr_in *) &addr)->sin_addr));
+			if(!result){
+				Tcl_SetResult(interp,errmsg,NULL);
+				return TCL_ERROR;
+			}
+
+		}
+		else{
+			strcpy(localaddr,"0.0.0.0");
+	
+		}
 		addr_len = sizeof(struct sockaddr_in);
 	}
 	if ( bind(sock,(struct sockaddr *)&addr, addr_len) < 0) {
@@ -382,6 +431,7 @@ udpOpen(ClientData clientData, Tcl_Interp *interp,
     statePtr->groupsObj = Tcl_NewListObj(0, NULL);
     Tcl_IncrRefCount(statePtr->groupsObj);
     statePtr->localport = localport;
+    strcpy(statePtr->localaddr,localaddr);
 	statePtr->ss_family = ss_family;
     Tcl_RegisterChannel(interp, statePtr->channel);
 #ifdef WIN32
