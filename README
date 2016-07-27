@@ -3,6 +3,12 @@ TclUDP
 
 This package provides UDP sockets for Tcl.
 
+UPDATE:
+	By default this library binds the specified port to ip 0.0.0.0. This causes that you no other interface (ip) can bind that port. The UDP package has been modified to accept the "ip" that we want to use to bind an specific port as an extra parameter. 
+
+	New Usage:
+		udp_open port localaddr
+
 INSTALLATION
 ============
 
